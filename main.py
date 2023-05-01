@@ -14,10 +14,11 @@ BUFFER = 1024
 C_RED = "\033[91m"
 C_GREEN = "\033[92m"
 C_BLUE = "\033[94m"
+C_ORANGE = "\033[93m"
 C_RESET = "\033[0m"
 
 # The timeframe to check for birthdays in
-TIMEFRAME = 2 #days
+TIMEFRAME = 16 #days
 
 # Email data
 SENDER = "bdayreminder@localhost"
@@ -27,6 +28,8 @@ SUBJECT = "Birthday Reminder 🎉 " + datetime.now().strftime("%d/%m/%Y")
 # Optional authentication
 USERNAME = base64.b64encode(SENDER.encode()).decode()
 PASSWORD = base64.b64encode("YourPassw0rd1H3re".encode()).decode()
+USERNAME = ""
+PASSWORD = ""
 
 def readDates():
     res = []
@@ -40,9 +43,9 @@ def readDates():
             name = " ".join(line.split()[1:])
             date = date.split("/")
             res.append({
-                "day":      int(date[0]),
-                "month":    int(date[1]),
-                "name":     name
+                "d": int(date[0]),
+                "m": int(date[1]),
+                "e": name
             })
 
     return res
@@ -52,7 +55,7 @@ def withinTime(day1, day2, timeframe):
         d1 = datetime.strptime(day1, '%d/%m/%Y')
         d2 = datetime.strptime(day2, '%d/%m/%Y')
         diff = (d1 - d2).days
-        return diff <= timeframe
+        return abs(diff) <= timeframe and diff >= 0
 
     except: # pylint: disable=bare-except
         return False
@@ -61,7 +64,7 @@ def constructBody(dates):
     body = f"Hi there,\n\nHere are the birthdays coming up in the next {TIMEFRAME} days:\n\n"
 
     for date in dates:
-        body += f"{date['day']}/{date['month']} - {date['name']}\n"
+        body += f"{date['d']}/{date['m']} - {date['e']}\n"
 
     body += "\nHave a great day!"
 
@@ -77,48 +80,30 @@ def sendEmail(dates):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
         client.connect((HOST, PORT))
 
-        recv = client.recv(1024).decode()
-        print(recv, end="")
+        print(client.recv(1024).decode(), end="")
 
-        client.send("EHLO BDay Reminder\r\n".encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
+        convo = [ "HELO BDay Reminder\r\n" ]
 
         # Optional authentication
         if USERNAME != "" and PASSWORD != "":
-            auth_login_command = "AUTH LOGIN\r\n"
-            client.send(auth_login_command.encode())
-            recv = client.recv(1024).decode()
-            print(recv)
+            convo += [
+                "AUTH LOGIN\r\n",
+                (USERNAME + "\r\n"),
+                (PASSWORD + "\r\n")
+            ]
 
-            client.send((USERNAME + "\r\n").encode())
-            recv = client.recv(1024).decode()
-            print(recv)
+        convo += [
+            f"MAIL FROM:<{SENDER}>\r\n",
+            f"RCPT TO:<{RECIPIENT}>\r\n",
+            "DATA\r\n",
+            (msg + endmsg),
+            "QUIT\r\n"
+        ]
 
-            client.send((PASSWORD + "\r\n").encode())
-            recv = client.recv(1024).decode()
-            print(recv)
-
-        client.send(f"MAIL FROM:<{SENDER}>\r\n".encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
-
-        client.send(f"RCPT TO:<{RECIPIENT}>\r\n".encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
-
-        client.send("DATA\r\n".encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
-
-        client.send((msg + endmsg).encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
-
-        quit_command = "QUIT\r\n"
-        client.send(quit_command.encode())
-        recv = client.recv(1024).decode()
-        print(recv, end="")
+        # Manifest conversation
+        for x in convo:
+            client.send(x.encode())
+            print(client.recv(1024).decode(), end="")
 
 if __name__ == "__main__":
     dates = readDates()
@@ -126,7 +111,7 @@ if __name__ == "__main__":
     # Check for birthdays within TIMEFRAME
     dates = list(filter(
         lambda x: withinTime(
-            f"{x['day']}/{x['month']}/{datetime.now().year}",
+            f"{x['d']}/{x['m']}/{datetime.now().year}",
             datetime.now().strftime("%d/%m/%Y"),
             TIMEFRAME
         ),
@@ -138,7 +123,14 @@ if __name__ == "__main__":
     if len(dates) == 0:
         print(f"{C_GREEN}No birthdays found{C_RESET}")
     else:
-        print("Found birthdays:", C_GREEN, "\n", "\n".join(map(json.dumps, dates)), C_RESET)
-        print(f"\n{C_BLUE}Sending email...{C_RESET}")
+        print(f"Found birthdays in {TIMEFRAME} days:", C_GREEN)
+        print("\n".join([f"{d['d']}/{d['m']}\t- {d['e']}" for d in dates]))
+        print(C_RESET)
+
+        print(f"{C_BLUE}Sending email...{C_RESET}")
 
         sendEmail(dates)
+
+        print(C_ORANGE, "="*50, C_RED)
+        print(" "*20, "All done!")
+        print(C_ORANGE, "="*50, C_RESET)
