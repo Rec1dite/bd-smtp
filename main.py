@@ -11,14 +11,22 @@ HOST = "localhost"
 PORT = 1025
 BUFFER = 1024
 
-TIMEFRAME = 6 #days
-
 C_RED = "\033[91m"
 C_GREEN = "\033[92m"
 C_BLUE = "\033[94m"
 C_RESET = "\033[0m"
 
+# The timeframe to check for birthdays in
+TIMEFRAME = 2 #days
+
+# Email data
+SENDER = "bdayreminder@localhost"
+RECIPIENT = "forgetful@localhost"
 SUBJECT = "Birthday Reminder 🎉 " + datetime.now().strftime("%d/%m/%Y")
+
+# Optional authentication
+USERNAME = base64.b64encode(SENDER.encode()).decode()
+PASSWORD = base64.b64encode("YourPassw0rd1H3re".encode()).decode()
 
 def readDates():
     res = []
@@ -44,7 +52,7 @@ def withinTime(day1, day2, timeframe):
         d1 = datetime.strptime(day1, '%d/%m/%Y')
         d2 = datetime.strptime(day2, '%d/%m/%Y')
         diff = (d1 - d2).days
-        return diff == timeframe
+        return diff <= timeframe
 
     except: # pylint: disable=bare-except
         return False
@@ -59,13 +67,10 @@ def constructBody(dates):
 
     return body
 
-def sendEmail(sender_email, recipient_email, dates):
-    # USERNAME = base64.b64encode(sender_email.encode()).decode()
-    # PASSWORD = base64.b64encode(sender_password.encode()).decode()
-
+def sendEmail(dates):
     body = constructBody(dates)
 
-    msg = f"From: {sender_email}\r\nTo: {recipient_email}\r\nSubject: {SUBJECT}\r\n\r\n{body}\r\n."
+    msg = f"From: {SENDER}\r\nTo: {RECIPIENT}\r\nSubject: {SUBJECT}\r\n\r\n{body}\r\n."
 
     endmsg = "\r\n.\r\n"
 
@@ -73,53 +78,47 @@ def sendEmail(sender_email, recipient_email, dates):
         client.connect((HOST, PORT))
 
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
-        ehlo_command = "EHLO Alice\r\n"
-        client.send(ehlo_command.encode())
+        client.send("EHLO BDay Reminder\r\n".encode())
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
-        # auth_login_command = "AUTH LOGIN\r\n"
-        # client.send(auth_login_command.encode())
-        # recv = client.recv(1024).decode()
-        # print(recv)
+        # Optional authentication
+        if USERNAME != "" and PASSWORD != "":
+            auth_login_command = "AUTH LOGIN\r\n"
+            client.send(auth_login_command.encode())
+            recv = client.recv(1024).decode()
+            print(recv)
 
-        # client.send((USERNAME + "\r\n").encode())
-        # recv = client.recv(1024).decode()
-        # print(recv)
+            client.send((USERNAME + "\r\n").encode())
+            recv = client.recv(1024).decode()
+            print(recv)
 
-        # client.send((PASSWORD + "\r\n").encode())
-        # recv = client.recv(1024).decode()
-        # print(recv)
+            client.send((PASSWORD + "\r\n").encode())
+            recv = client.recv(1024).decode()
+            print(recv)
 
-        mail_from_command = f"MAIL FROM:<{sender_email}>\r\n"
-        client.send(mail_from_command.encode())
+        client.send(f"MAIL FROM:<{SENDER}>\r\n".encode())
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
-        rcpt_to_command = f"RCPT TO:<{recipient_email}>\r\n"
-        client.send(rcpt_to_command.encode())
+        client.send(f"RCPT TO:<{RECIPIENT}>\r\n".encode())
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
-        data_command = "DATA\r\n"
-        client.send(data_command.encode())
+        client.send("DATA\r\n".encode())
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
         client.send((msg + endmsg).encode())
         recv = client.recv(1024).decode()
-        print(recv)
+        print(recv, end="")
 
         quit_command = "QUIT\r\n"
         client.send(quit_command.encode())
         recv = client.recv(1024).decode()
-        print(recv)
-
-# Example usage:
-# send_email('smtp.gmail.com', 587, 'myemail@gmail.com', 'mypassword', 'recipient@gmail.com', 'Hello!', 'This is a test email.')
-
+        print(recv, end="")
 
 if __name__ == "__main__":
     dates = readDates()
@@ -140,5 +139,6 @@ if __name__ == "__main__":
         print(f"{C_GREEN}No birthdays found{C_RESET}")
     else:
         print("Found birthdays:", C_GREEN, "\n", "\n".join(map(json.dumps, dates)), C_RESET)
-        print(f"\n{C_BLUE}Sending emails...{C_RESET}")
+        print(f"\n{C_BLUE}Sending email...{C_RESET}")
+
         sendEmail(dates)
