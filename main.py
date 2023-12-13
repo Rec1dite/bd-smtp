@@ -1,10 +1,9 @@
-# A simple smtp server to send birthday reminders to users
+# A simple smtp client to send birthday reminders to users
 # pylint: disable=missing-docstring, invalid-name, redefined-outer-name
 
 from datetime import datetime
 import socket
 import base64
-import json
 import os
 
 HOST = "localhost"
@@ -71,9 +70,10 @@ def constructBody(dates):
     return body
 
 def sendEmail(dates):
+    convo = ""
     body = constructBody(dates)
 
-    msg = f"From: {SENDER}\r\nTo: {RECIPIENT}\r\nSubject: {SUBJECT}\r\n\r\n{body}\r\n."
+    msg = f"From: {SENDER}\r\nTo: {RECIPIENT}\r\nSubject: {SUBJECT}\r\n\r\n{body}\r\n"
 
     endmsg = "\r\n.\r\n"
 
@@ -99,6 +99,8 @@ def sendEmail(dates):
             (msg + endmsg),
             "QUIT\r\n"
         ]
+
+        # convo += f"Date {datetime.now()}\r\n"
 
         # Manifest conversation
         for x in convo:
